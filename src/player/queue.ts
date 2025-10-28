@@ -1,5 +1,7 @@
 import { cancel as ttsCancel, pause as ttsPause, resume as ttsResume, speak, SpeakSettings } from "@/tts/engine";
 
+const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+
 export type PlayerState = "playing" | "paused" | "stopped";
 
 export interface PlayerListeners {
@@ -66,9 +68,11 @@ export class PlayerQueue {
     }
     this.index = Math.min(this.index, Math.max(this.chunks.length - 1, 0));
     this.currentChunkLength = this.chunks[this.index]?.length ?? 0;
-    this.resumeFromOffset = Math.min(prevOffset, this.currentChunkLength);
-    this.spokenOffsetBase = Math.min(this.spokenOffsetBase, this.currentChunkLength);
-    this.lastKnownCharOffset = Math.min(prevOffset, this.currentChunkLength);
+    const safeOffset = clamp(prevOffset, 0, this.currentChunkLength);
+    this.resumeFromOffset = safeOffset;
+    this.spokenOffsetBase = safeOffset;
+    this.lastKnownCharOffset = safeOffset;
+    this.boundarySupported = false;
     this.emitIndex();
     if (wasPlaying) {
       this.restartCurrent(this.resumeFromOffset);
@@ -88,25 +92,22 @@ export class PlayerQueue {
     const voiceChanged = patch.voice !== undefined && patch.voice !== prevVoice;
     const volumeChanged = patch.volume !== undefined && patch.volume !== prevVolume;
 
-    if (voiceChanged && this.state === "playing") {
-      this.restartCurrent(0);
-      return;
-    }
-
-    if (voiceChanged && this.state === "playing") {
-      this.restartCurrent(0);
-      return;
+    if (voiceChanged) {
+      if (this.state === "playing") {
+        const restartOffset = this.boundarySupported ? this.lastKnownCharOffset : 0;
+        this.restartCurrent(restartOffset);
+        return;
+      }
+      this.resumeFromOffset = this.lastKnownCharOffset;
     }
 
     if (volumeChanged && this.utterance) {
       this.utterance.volume = this.settings.volume;
     }
 
-    if (rateChanged) {
-      if (this.state === "playing") {
-        const restartOffset = this.boundarySupported ? this.lastKnownCharOffset : 0;
-        this.restartCurrent(restartOffset);
-      }
+    if (rateChanged && this.state === "playing") {
+      const restartOffset = this.boundarySupported ? this.lastKnownCharOffset : 0;
+      this.restartCurrent(restartOffset);
     }
   }
 
@@ -173,21 +174,33 @@ export class PlayerQueue {
     }
   }
 
-  seek(index: number, options: { play: boolean }): void {
+  seek(target: number | { index: number; offset?: number }, options: { play: boolean }): void {
     if (!this.chunks.length) return;
-    this.index = Math.max(0, Math.min(index, this.chunks.length - 1));
+    const nextIndex = typeof target === "number" ? target : target.index;
+    const nextOffset = typeof target === "number" ? 0 : target.offset ?? 0;
+    this.index = clamp(nextIndex, 0, this.chunks.length - 1);
+    this.currentChunkLength = this.chunks[this.index]?.length ?? 0;
+    const normalizedOffset = clamp(nextOffset, 0, this.currentChunkLength);
+    this.resumeFromOffset = normalizedOffset;
+    this.spokenOffsetBase = normalizedOffset;
+    this.lastKnownCharOffset = normalizedOffset;
+    this.boundarySupported = false;
+
     this.detachUtterance();
+    const wasPlaying = this.state === "playing";
     ttsCancel();
-    this.resetOffsets();
+    this.retries = 0;
+    this.emitIndex();
+
     if (options.play) {
       this.state = "playing";
       this.emitState();
       this.speakCurrent();
     } else {
-      if (this.state === "playing") {
-        this.pause();
+      if (wasPlaying) {
+        this.state = "paused";
+        this.emitState();
       }
-      this.emitIndex();
     }
   }
 
@@ -265,7 +278,7 @@ export class PlayerQueue {
     this.detachUtterance();
     ttsCancel();
     this.retries = 0;
-    this.resumeFromOffset = Math.max(0, Math.min(offset, this.currentChunkLength));
+    this.resumeFromOffset = clamp(offset, 0, this.currentChunkLength);
     this.speakCurrent();
   }
 
