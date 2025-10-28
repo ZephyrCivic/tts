@@ -1,0 +1,9 @@
+{
+  "name": "yomiage-web-tts",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs -p 5173"
+  }
+}
+
