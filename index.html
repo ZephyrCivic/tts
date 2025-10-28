@@ -19,13 +19,11 @@
         <span id="voiceWarning" class="warning" aria-live="polite" hidden>日本語音声が見つかりません</span>
       </div>
 
-      <div class="control-row">
+      <div class="control-row sliders">
         <label for="rate">速度 <span id="rateVal">1.00</span>x</label>
         <input id="rate" type="range" min="0.5" max="2" step="0.05" value="1" />
         <label for="pitch">ピッチ <span id="pitchVal">1.00</span></label>
         <input id="pitch" type="range" min="0.5" max="2" step="0.05" value="1" />
-        <label for="volume">音量 <span id="volumeVal">1.00</span></label>
-        <input id="volume" type="range" min="0" max="1" step="0.05" value="1" />
       </div>
 
       <div class="control-row buttons">
@@ -53,7 +51,7 @@
         <ul>
           <li>音声合成は端末内のみ（ネットワーク送信なし）。</li>
           <li>iOS/Safariでは初回にユーザー操作が必要です。</li>
-          <li>速度・ピッチは次の文から反映（即時反映は設定で対応予定）。</li>
+          <li>速度は再生中でも即時に反映されます（ピッチ変更は次の文から）。</li>
           <li>キーボード: Space=再生/一時停止, [ / ]=前/次, +/-=速度。</li>
         </ul>
       </details>
