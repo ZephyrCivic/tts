@@ -56,6 +56,7 @@ export class PlayerQueue {
   updateSettings(patch: SpeakSettings): void {
     const prevRate = this.settings.rate;
     const prevVoice = this.settings.voice;
+    const prevVolume = this.settings.volume;
     this.settings = {
       rate: patch.rate ?? this.settings.rate,
       volume: patch.volume ?? this.settings.volume,
@@ -63,15 +64,18 @@ export class PlayerQueue {
     };
     const rateChanged = patch.rate !== undefined && patch.rate !== prevRate;
     const voiceChanged = patch.voice !== undefined && patch.voice !== prevVoice;
+    const volumeChanged = patch.volume !== undefined && patch.volume !== prevVolume;
 
     if (voiceChanged && this.state === "playing") {
       this.restartCurrent(0);
       return;
     }
 
-    if (rateChanged && this.state === "playing") {
-      const restartOffset = this.boundarySupported ? this.lastKnownCharOffset : 0;
-      this.restartCurrent(restartOffset);
+    if (rateChanged || volumeChanged) {
+      if (this.state === "playing") {
+        const restartOffset = this.boundarySupported ? this.lastKnownCharOffset : 0;
+        this.restartCurrent(restartOffset);
+      }
     }
   }
 

@@ -88,7 +88,7 @@ function useSpeechVoices() {
   };
 }
 
-function usePlayer(chunks: string[], options: { rate: number; voice: SpeechSynthesisVoice | null }) {
+function usePlayer(chunks: string[], options: { rate: number; volume: number; voice: SpeechSynthesisVoice | null }) {
   const queueRef = useRef<PlayerQueue | null>(null);
   const [playerState, setPlayerState] = useState<PlayerState>("stopped");
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -124,7 +124,7 @@ function usePlayer(chunks: string[], options: { rate: number; voice: SpeechSynth
 
   useEffect(() => {
     if (!queueRef.current) return;
-    queueRef.current.updateSettings({ rate: options.rate, voice: options.voice ?? null });
+    queueRef.current.updateSettings({ rate: options.rate, volume: options.volume, voice: options.voice ?? null });
   }, [options.rate, options.voice]);
 
   useEffect(() => {
@@ -177,6 +177,7 @@ const App = () => {
   const [rawInput, setRawInput] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("text");
   const [rate, setRate] = useState(1);
+  const [volume, setVolume] = useState(1);
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
   const {
@@ -203,6 +204,7 @@ const App = () => {
     boundarySupported
   } = usePlayer(chunks, {
     rate,
+    volume,
     voice: selectedVoice
   });
 
@@ -285,6 +287,8 @@ const App = () => {
             <span>残り {etaLabel}</span>
             <Type className="h-4 w-4" />
             <span>{chunks.reduce((sum, chunk) => sum + chunk.length, 0)} 文字</span>
+            <Volume2 className="h-4 w-4" />
+            <span>{Math.round(volume * 100)}%</span>
           </div>
         </div>
         {!ttsSupported && (
@@ -341,6 +345,12 @@ const App = () => {
                   ))}
                 </SelectContent>
               </Select>
+              {googleOnly && voices.length === 1 && (
+                <p className="text-xs text-muted-foreground">Google 日本語 voice のみ利用可能です。</p>
+              )}
+              {fallbackUsed && (
+                <p className="text-xs text-muted-foreground">利用可能な日本語 voice を使用しています。</p>
+              )}
               {googleOnly && voices.length === 1 && (
                 <p className="text-xs text-muted-foreground">Google 日本語 voice のみ利用可能です。</p>
               )}
