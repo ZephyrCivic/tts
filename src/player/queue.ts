@@ -291,7 +291,7 @@ export class PlayerQueue {
     const rate = this.settings.rate;
     if (rate <= 1.05) return 1;
     if (rate <= 1.3) return Number((1 - (rate - 1) * 0.25).toFixed(2));
-    if (rate <= 1.7) return Number((0.95 - (rate - 1.3) * 0.2).toFixed(2));
+    if (rate <= 1.5) return Number((0.95 - (rate - 1.3) * 0.2).toFixed(2));
     return 0.85;
   }
 }

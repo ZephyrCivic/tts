@@ -32,6 +32,16 @@ const formatSeconds = (sec: number): string => {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 };
 
+const stripUrls = (input: string): string => {
+  if (!input) return "";
+  return input
+    .replace(/\[[^\]]*?\]\((https?:\/\/[^\s)]+)\)/g, "$1")
+    .replace(/https?:\/\/[^\s]+/g, "")
+    .replace(/\bwww\.[^\s]+/g, "")
+    .replace(/[\t ]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n");
+};
+
 function useSpeechVoices() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
@@ -179,6 +189,7 @@ const App = () => {
   const [rate, setRate] = useState(1);
   const [volume, setVolume] = useState(1);
   const [prevVolume, setPrevVolume] = useState(1);
+  const [skipUrls, setSkipUrls] = useState(true);
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
   const {
@@ -192,7 +203,8 @@ const App = () => {
   } = useSpeechVoices();
 
   const speakingText = useMemo(() => (viewMode === "markdown" ? markdownToPlainText(rawInput) : rawInput), [rawInput, viewMode]);
-  const chunks = useMemo(() => segmentJapanese(speakingText), [speakingText]);
+  const filteredText = useMemo(() => (skipUrls ? stripUrls(speakingText) : speakingText), [speakingText, skipUrls]);
+  const chunks = useMemo(() => segmentJapanese(filteredText), [filteredText]);
 
   const {
     playerState,
@@ -250,7 +262,7 @@ const App = () => {
           commands.prev();
           break;
         case "+":
-          setRate((prev) => Math.min(2, Number((prev + 0.05).toFixed(2))));
+          setRate((prev) => Math.min(1.5, Number((prev + 0.05).toFixed(2))));
           break;
         case "-":
           setRate((prev) => Math.max(0.5, Number((prev - 0.05).toFixed(2))));
@@ -352,23 +364,35 @@ const App = () => {
           <CardContent className="space-y-5">
             <div className="grid gap-2">
               <Label htmlFor="voice-select">音声（日本語）</Label>
-              <Select value={selectedId || undefined} onValueChange={setSelectedId}>
-                <SelectTrigger id="voice-select" aria-label="日本語音声の選択" disabled={!voices.length || voices.length === 1}>
-                  <SelectValue placeholder="音声を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  {voices.map((voice, idx) => (
-                    <SelectItem key={voice.voiceURI} value={String(idx)}>
-                      {voice.name} ({voice.lang})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {googleOnly ? (
-                <p className="text-xs text-muted-foreground">Google 日本語 voice のみ利用可能です。</p>
-              ) : fallbackUsed ? (
-                <p className="text-xs text-muted-foreground">利用可能な日本語 voice を使用しています。</p>
-              ) : null}
+              {voices.length > 1 ? (
+                <Select value={selectedId || undefined} onValueChange={setSelectedId}>
+                  <SelectTrigger id="voice-select" aria-label="日本語音声の選択" disabled={!voices.length}>
+                    <SelectValue placeholder="音声を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {voices.map((voice, idx) => (
+                      <SelectItem key={voice.voiceURI} value={String(idx)}>
+                        {voice.name} ({voice.lang})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                  {googleOnly ? "Google 日本語 voice のみ利用可能です。" : fallbackUsed ? "利用可能な日本語 voice を使用しています。" : "日本語 voice を使用しています。"}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input
+                id="skip-urls"
+                type="checkbox"
+                checked={skipUrls}
+                onChange={(event) => setSkipUrls(event.target.checked)}
+                className="h-4 w-4 rounded border border-input"
+              />
+              <Label htmlFor="skip-urls" className="cursor-pointer">URLを読み上げない</Label>
             </div>
 
             <div className="grid gap-4">
@@ -377,12 +401,13 @@ const App = () => {
                 <Slider
                   id="rate-slider"
                   min={0.5}
-                  max={2}
+                  max={1.5}
                   step={0.05}
                   value={[rate]}
                   onValueChange={([val]) => {
                     const next = typeof val === "number" ? val : rate;
-                    setRate(Number(next.toFixed(2)));
+                    const clamped = Math.min(Math.max(next, 0.5), 1.5);
+                    setRate(Number(clamped.toFixed(2)));
                   }}
                   aria-label="速度"
                 />
