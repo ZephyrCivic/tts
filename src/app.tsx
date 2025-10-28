@@ -329,13 +329,8 @@ const App = () => {
           </Alert>
         )}
         {!warningMessage && fallbackUsed && (
-          <Alert className="border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-600/50 dark:bg-blue-900/30 dark:text-blue-100">
-            利用可能な日本語 voice を使用しています。
-          </Alert>
-        )}
-        {!warningMessage && googleOnly && (
           <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/50 dark:bg-emerald-900/30 dark:text-emerald-100">
-            Google 日本語 voice のみ利用可能です。
+            {googleOnly ? "Google 日本語 voice のみ利用可能です。" : "利用可能な日本語 voice を使用しています。"}
           </Alert>
         )}
         {lastError && (
