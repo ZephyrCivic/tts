@@ -11,7 +11,6 @@ const els = {
   voiceWarning: document.getElementById('voiceWarning'),
   rate: document.getElementById('rate'), rateVal: document.getElementById('rateVal'),
   pitch: document.getElementById('pitch'), pitchVal: document.getElementById('pitchVal'),
-  volume: document.getElementById('volume'), volumeVal: document.getElementById('volumeVal'),
   playPause: document.getElementById('playPause'), stop: document.getElementById('stop'),
   prev: document.getElementById('prev'), next: document.getElementById('next'),
   progress: document.getElementById('progress'), eta: document.getElementById('eta'),
@@ -27,6 +26,7 @@ const state = {
   chunks: [],
   viewMode: 'text',
   settings: { rate: 1, pitch: 1, volume: 1, voice: null },
+  settings: { rate: 1, pitch: 1, voice: null },
   queue: null,
 };
 
@@ -121,7 +121,6 @@ function fillVoices(vs, selected) {
 function syncSliders() {
   els.rateVal.textContent = Number(els.rate.value).toFixed(2);
   els.pitchVal.textContent = Number(els.pitch.value).toFixed(2);
-  els.volumeVal.textContent = Number(els.volume.value).toFixed(2);
 }
 
 //
@@ -145,16 +144,16 @@ async function init() {
     const idx = Number(els.voiceSelect.value);
     const selected = ja[idx];
     state.settings.voice = selected || null;
+    state.queue?.updateSettings({ voice: state.settings.voice });
   });
 
   // Sliders
-  [els.rate, els.pitch, els.volume].forEach((input) => {
+  [els.rate, els.pitch].forEach((input) => {
     input.addEventListener('input', () => {
       state.settings.rate = Number(els.rate.value);
       state.settings.pitch = Number(els.pitch.value);
-      state.settings.volume = Number(els.volume.value);
       syncSliders();
-      state.queue?.updateSettings(state.settings); // 変更は次チャンクから反映
+      state.queue?.updateSettings({ rate: state.settings.rate, pitch: state.settings.pitch });
     });
   });
   syncSliders();
