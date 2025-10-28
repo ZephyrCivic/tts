@@ -2,70 +2,12 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Yomiage Web TTS</title>
-    <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
-    <header class="app-header">
-      <h1>Yomiage Web TTS（日本語）</h1>
-      <p class="subtitle">貼り付けた長文を、デバイス内TTSだけで読み上げ</p>
-    </header>
-
-    <section class="controls" aria-label="再生コントロール">
-      <div class="control-row">
-        <label for="voiceSelect">音声</label>
-        <select id="voiceSelect" aria-label="日本語音声の選択"></select>
-        <span id="voiceWarning" class="warning" aria-live="polite" hidden>日本語音声が見つかりません</span>
-      </div>
-
-      <div class="control-row sliders">
-        <label for="rate">速度 <span id="rateVal">1.00</span>x</label>
-        <input id="rate" type="range" min="0.5" max="2" step="0.05" value="1" />
-        <label for="pitch">ピッチ <span id="pitchVal">1.00</span></label>
-        <input id="pitch" type="range" min="0.5" max="2" step="0.05" value="1" />
-      </div>
-
-      <div class="control-row buttons">
-        <button id="playPause" aria-label="再生/一時停止">▶ 再生</button>
-        <button id="stop" aria-label="停止">■ 停止</button>
-        <button id="prev" aria-label="前の文">⟵ 前</button>
-        <button id="next" aria-label="次の文">次 ⟶</button>
-        <span id="progress" class="progress" aria-live="polite">0 / 0</span>
-        <span id="eta" class="eta" aria-live="polite">残り --:--</span>
-      </div>
-    </section>
-
-    <section class="paste" aria-label="テキスト入力">
-      <textarea id="paste" placeholder="ここにビジネス文書などの長文を貼り付けてください（保存はされません）" rows="12"></textarea>
-    </section>
-
-    <section class="viewer" aria-label="読み上げ対象テキスト">
-      <div class="viewer-header">
-        <h2>プレビュー</h2>
-        <div class="viewer-switch" role="radiogroup" aria-label="表示モード">
-          <label><input type="radio" name="displayMode" value="text" checked />テキスト</label>
-          <label><input type="radio" name="displayMode" value="markdown" />Markdown</label>
-        </div>
-      </div>
-      <p id="modeHint" class="mode-hint" hidden>Markdownプレビュー中はハイライト確認のため「テキスト」に切り替えられます。</p>
-      <div id="viewerText" class="viewer-content viewer-text" tabindex="0" aria-live="off"></div>
-      <div id="viewerMarkdown" class="viewer-content viewer-markdown" tabindex="0" aria-live="polite" hidden></div>
-    </section>
-
-    <section class="help">
-      <details>
-        <summary>ヘルプ / 既知の制約</summary>
-        <ul>
-          <li>音声合成は端末内のみ（ネットワーク送信なし）。</li>
-          <li>iOS/Safariでは初回にユーザー操作が必要です。</li>
-          <li>速度は再生中でも即時に反映されます（ピッチ変更は次の文から）。</li>
-          <li>キーボード: Space=再生/一時停止, [ / ]=前/次, +/-=速度。</li>
-        </ul>
-      </details>
-    </section>
-
-    <script type="module" src="src/app.js"></script>
+  <body class="min-h-screen bg-background text-foreground antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
-  </html>
-
+</html>

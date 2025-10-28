@@ -1,6 +1,6 @@
-const BLOCK_TAGS = new Set(["h1","h2","h3","h4","h5","h6","p","ul","ol","pre","blockquote","hr"]);
+const BLOCK_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol", "pre", "blockquote", "hr"]);
 
-function escapeHtml(str) {
+function escapeHtml(str: string | null | undefined): string {
   const input = str ?? "";
   return String(input)
     .replace(/&/g, "&amp;")
@@ -10,7 +10,7 @@ function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
-function applyInline(text) {
+function applyInline(text: string): string {
   if (!text) return "";
   let out = text;
   out = out.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
@@ -18,27 +18,27 @@ function applyInline(text) {
   out = out.replace(/\*(?!\*)([^*]+)\*/g, "<em>$1</em>");
   out = out.replace(/_(?!_)([^_]+)_/g, "<em>$1</em>");
   out = out.replace(/`([^`]+)`/g, "<code>$1</code>");
-  out = out.replace(/!\[([^\]]*?)\]\(([^)]+)\)/g, (m, alt) => `<span class="md-img">[画像:${alt}]</span>`);
-  out = out.replace(/\[([^\]]+?)\]\(([^)\s]+)(?:\s+\"([^\"]+)\")?\)/g, (m, text, url, title) => {
+  out = out.replace(/!\[([^\]]*?)\]\(([^)]+)\)/g, (_, alt: string) => `<span class="md-img">[画像:${alt}]</span>`);
+  out = out.replace(/\[([^\]]+?)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)/g, (match, linkText: string, url: string, title?: string) => {
     const safeUrl = /^https?:\/\//i.test(url) ? url : "";
     const titleAttr = title ? ` title="${title}"` : "";
-    return safeUrl ? `<a href="${safeUrl}" target="_blank" rel="noopener"${titleAttr}>${text}</a>` : text;
+    return safeUrl ? `<a href="${safeUrl}" target="_blank" rel="noopener"${titleAttr}>${linkText}</a>` : linkText;
   });
   return out;
 }
 
-export function markdownToHtml(markdown) {
+export function markdownToHtml(markdown: string): string {
   if (!markdown) return "";
   const normalized = markdown.replace(/\r\n?/g, "\n");
   const lines = normalized.split("\n");
-  const out = [];
-  let paragraph = [];
+  const out: string[] = [];
+  let paragraph: string[] = [];
   let inCode = false;
   let codeLang = "";
-  let codeBuffer = [];
-  let listType = null;
-  let listBuffer = [];
-  let blockquoteBuffer = [];
+  let codeBuffer: string[] = [];
+  let listType: "ul" | "ol" | null = null;
+  let listBuffer: string[] = [];
+  let blockquoteBuffer: string[] = [];
 
   const flushParagraph = () => {
     if (!paragraph.length) return;
@@ -64,7 +64,9 @@ export function markdownToHtml(markdown) {
     if (!inCode) return;
     const langClass = codeLang ? ` class="language-${codeLang}"` : "";
     out.push(`<pre><code${langClass}>${codeBuffer.join("\n")}</code></pre>`);
-    inCode = false; codeLang = ""; codeBuffer = [];
+    inCode = false;
+    codeLang = "";
+    codeBuffer = [];
   };
 
   const finishLineBlock = () => {
@@ -107,7 +109,7 @@ export function markdownToHtml(markdown) {
     if (/^\s*([-*+])\s+/.test(raw)) {
       flushParagraph();
       flushBlockquote();
-      const currentType = "ul";
+      const currentType: "ul" = "ul";
       if (listType && listType !== currentType) flushList();
       listType = currentType;
       const content = raw.replace(/^\s*[-*+]\s+/, "");
@@ -118,7 +120,7 @@ export function markdownToHtml(markdown) {
     if (/^\s*\d+\.\s+/.test(raw)) {
       flushParagraph();
       flushBlockquote();
-      const currentType = "ol";
+      const currentType: "ol" = "ol";
       if (listType && listType !== currentType) flushList();
       listType = currentType;
       const content = raw.replace(/^\s*\d+\.\s+/, "");
@@ -152,7 +154,7 @@ export function markdownToHtml(markdown) {
   return out.join("\n");
 }
 
-export function markdownToPlainText(markdown) {
+export function markdownToPlainText(markdown: string): string {
   if (!markdown) return "";
   const html = markdownToHtml(markdown);
   if (!html) return markdown;
@@ -161,11 +163,13 @@ export function markdownToPlainText(markdown) {
   return tmp.textContent ? tmp.textContent.trim() : "";
 }
 
-export function hasBlockContent(html) {
+export function hasBlockContent(html: string): boolean {
   if (!html) return false;
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
   if (tmp.textContent && tmp.textContent.trim()) return true;
-  return Array.from(tmp.children).some((child) => BLOCK_TAGS.has(child.tagName.toLowerCase()) || child.textContent.trim());
+  return Array.from(tmp.children).some((child) => {
+    const tag = child.tagName.toLowerCase();
+    return BLOCK_TAGS.has(tag) || !!child.textContent?.trim();
+  });
 }
-
