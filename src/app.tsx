@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Square, ChevronLeft, ChevronRight, Volume2, Clock, Type, FileText } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Play, Pause, Square, ChevronLeft, ChevronRight, Volume2, VolumeX, Clock, Type, FileText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -125,7 +125,7 @@ function usePlayer(chunks: string[], options: { rate: number; volume: number; vo
   useEffect(() => {
     if (!queueRef.current) return;
     queueRef.current.updateSettings({ rate: options.rate, volume: options.volume, voice: options.voice ?? null });
-  }, [options.rate, options.voice]);
+  }, [options.rate, options.volume, options.voice]);
 
   useEffect(() => {
     const queue = queueRef.current;
@@ -178,6 +178,7 @@ const App = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("text");
   const [rate, setRate] = useState(1);
   const [volume, setVolume] = useState(1);
+  const [prevVolume, setPrevVolume] = useState(1);
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
   const {
@@ -207,6 +208,24 @@ const App = () => {
     volume,
     voice: selectedVoice
   });
+
+  const handleVolumeChange = useCallback((value: number) => {
+    const clamped = Number(Math.min(Math.max(value, 0), 1).toFixed(2));
+    if (clamped > 0) {
+      setPrevVolume(clamped);
+    }
+    setVolume(clamped);
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    if (volume === 0) {
+      const restore = prevVolume > 0 ? prevVolume : 1;
+      handleVolumeChange(restore);
+    } else {
+      setPrevVolume(volume || prevVolume || 1);
+      handleVolumeChange(0);
+    }
+  }, [volume, prevVolume, handleVolumeChange]);
 
   const textViewerRef = useRef<HTMLDivElement>(null);
 
@@ -287,7 +306,7 @@ const App = () => {
             <span>残り {etaLabel}</span>
             <Type className="h-4 w-4" />
             <span>{chunks.reduce((sum, chunk) => sum + chunk.length, 0)} 文字</span>
-            <Volume2 className="h-4 w-4" />
+            {(volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />)}
             <span>{Math.round(volume * 100)}%</span>
           </div>
         </div>
@@ -303,12 +322,12 @@ const App = () => {
         )}
         {!warningMessage && fallbackUsed && (
           <Alert className="border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-600/50 dark:bg-blue-900/30 dark:text-blue-100">
-            Google 日本語 voice が見つからなかったため、この環境で利用できる日本語 voice で読み上げます。
+            利用可能な日本語 voice を使用しています。
           </Alert>
         )}
         {!warningMessage && googleOnly && (
           <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/50 dark:bg-emerald-900/30 dark:text-emerald-100">
-            Google 日本語 voice を使用しています。速度変更時も聞き取りやすさを自動調整します。
+            Google 日本語 voice のみ利用可能です。
           </Alert>
         )}
         {lastError && (
@@ -345,18 +364,11 @@ const App = () => {
                   ))}
                 </SelectContent>
               </Select>
-              {googleOnly && voices.length === 1 && (
+              {googleOnly ? (
                 <p className="text-xs text-muted-foreground">Google 日本語 voice のみ利用可能です。</p>
-              )}
-              {fallbackUsed && (
+              ) : fallbackUsed ? (
                 <p className="text-xs text-muted-foreground">利用可能な日本語 voice を使用しています。</p>
-              )}
-              {googleOnly && voices.length === 1 && (
-                <p className="text-xs text-muted-foreground">Google 日本語 voice のみ利用可能です。</p>
-              )}
-              {fallbackUsed && (
-                <p className="text-xs text-muted-foreground">利用可能な日本語 voice を使用しています。</p>
-              )}
+              ) : null}
             </div>
 
             <div className="grid gap-4">
@@ -379,6 +391,31 @@ const App = () => {
                     一部ブラウザでは速度変更が次の文から反映されます。
                   </p>
                 )}
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="volume-slider">音量 {Math.round(volume * 100)}%</Label>
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={toggleMute}
+                    aria-label={volume === 0 ? "ミュート解除" : "ミュート"}
+                  >
+                    {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  </Button>
+                  <Slider
+                    id="volume-slider"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={[volume]}
+                    onValueChange={([val]) => handleVolumeChange(typeof val === "number" ? val : volume)}
+                    aria-label="音量"
+                    className="flex-1"
+                  />
+                  <span className="w-12 text-right text-xs text-muted-foreground">{Math.round(volume * 100)}%</span>
+                </div>
               </div>
             </div>
 
