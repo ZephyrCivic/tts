@@ -216,6 +216,7 @@
 ### Notes
 - UIをShadcn/UIベースに刷新し、React + Tailwind構成へ全面移行。
 - 既存の分割・再生ロジックはTypeScript化して再利用し、モバイル向けにレイアウトを再設計。
+- GitHub Pages での配信は `npm run build:pages` 実行後に `docs/` を公開する想定。
 
 # Exec Plan: M1 雛形 + MVP再生
 
