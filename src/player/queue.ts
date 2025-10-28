@@ -105,12 +105,13 @@ export class PlayerQueue {
   }
 
   stop(): void {
+    this.detachUtterance();
     ttsCancel();
     this.state = "stopped";
     this.emitState();
     this.resetOffsets();
-    this.utterance = null;
     this.retries = 0;
+    this.emitProgress();
   }
 
   next(): void {
@@ -140,8 +141,8 @@ export class PlayerQueue {
   seek(index: number, options: { play: boolean }): void {
     if (!this.chunks.length) return;
     this.index = Math.max(0, Math.min(index, this.chunks.length - 1));
+    this.detachUtterance();
     ttsCancel();
-    this.utterance = null;
     this.resetOffsets();
     if (options.play) {
       this.state = "playing";
@@ -188,7 +189,7 @@ export class PlayerQueue {
     this.emitIndex();
     this.emitProgress();
 
-    this.utterance = speak(remaining, this.settings, {
+    this.utterance = speak(remaining, this.buildSpeakSettings(), {
       onboundary: (event) => {
         this.boundarySupported = true;
         const delta = typeof event.charIndex === "number" ? event.charIndex : 0;
@@ -226,11 +227,7 @@ export class PlayerQueue {
 
   private restartCurrent(offset: number): void {
     if (!this.chunks.length) return;
-    if (this.utterance) {
-      this.utterance.onend = null;
-      this.utterance.onerror = null;
-      this.utterance.onboundary = null;
-    }
+    this.detachUtterance();
     ttsCancel();
     this.retries = 0;
     this.resumeFromOffset = Math.max(0, Math.min(offset, this.currentChunkLength));
@@ -242,6 +239,7 @@ export class PlayerQueue {
     this.spokenOffsetBase = 0;
     this.currentChunkLength = this.chunks[this.index]?.length ?? 0;
     this.lastKnownCharOffset = 0;
+    this.boundarySupported = false;
   }
 
   private emitIndex(): void {
@@ -265,5 +263,31 @@ export class PlayerQueue {
       charOffset: this.lastKnownCharOffset,
       boundarySupported: this.boundarySupported
     });
+  }
+
+  private detachUtterance(): void {
+    if (this.utterance) {
+      this.utterance.onend = null;
+      this.utterance.onerror = null;
+      this.utterance.onboundary = null;
+    }
+    this.utterance = null;
+  }
+
+  private buildSpeakSettings(): SpeakSettings {
+    return {
+      rate: this.settings.rate,
+      volume: this.settings.volume,
+      voice: this.settings.voice ?? undefined,
+      pitch: this.computePitch()
+    };
+  }
+
+  private computePitch(): number {
+    const rate = this.settings.rate;
+    if (rate <= 1.05) return 1;
+    if (rate <= 1.3) return Number((1 - (rate - 1) * 0.25).toFixed(2));
+    if (rate <= 1.7) return Number((0.95 - (rate - 1.3) * 0.2).toFixed(2));
+    return 0.85;
   }
 }

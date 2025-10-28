@@ -35,11 +35,13 @@ const formatSeconds = (sec: number): string => {
 function useSpeechVoices() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
-  const [warning, setWarning] = useState<boolean>(false);
+  const [warningMessage, setWarningMessage] = useState<string | null>(null);
+  const [googleOnly, setGoogleOnly] = useState<boolean>(false);
+  const [fallbackUsed, setFallbackUsed] = useState<boolean>(false);
 
   useEffect(() => {
     if (!canUseTTS()) {
-      setWarning(true);
+      setWarningMessage("このブラウザでは SpeechSynthesis が利用できません。対応ブラウザ（Chrome/Edge 最新、Safari 16+）をご利用ください。");
       return;
     }
     let cancelled = false;
@@ -47,15 +49,21 @@ function useSpeechVoices() {
       const all = await waitForVoices();
       if (cancelled) return;
       const ja = japaneseVoices(all);
-      setVoices(ja);
-      if (!ja.length) {
-        setWarning(true);
+      const googleCandidates = ja.filter((voice) =>
+        /google/i.test(voice.name || "") && /日本語|ja-JP/i.test(`${voice.name} ${voice.lang}`)
+      );
+      const finalVoices = googleCandidates.length ? googleCandidates : ja;
+      setVoices(finalVoices);
+      setGoogleOnly(googleCandidates.length > 0);
+      setFallbackUsed(googleCandidates.length === 0 && finalVoices.length > 0);
+      if (!finalVoices.length) {
+        setWarningMessage("日本語音声が検出できませんでした。ブラウザやOSの言語設定を確認してください。");
         return;
       }
-      const def = chooseDefault(ja);
-      const index = def ? ja.findIndex((voice) => voice === def) : 0;
+      const def = chooseDefault(finalVoices);
+      const index = def ? finalVoices.findIndex((voice) => voice === def) : 0;
       setSelectedId(String(Math.max(index, 0)));
-      setWarning(false);
+      setWarningMessage(null);
     })();
     return () => {
       cancelled = true;
@@ -74,7 +82,9 @@ function useSpeechVoices() {
     selectedId,
     setSelectedId,
     selectedVoice,
-    warning
+    warningMessage,
+    googleOnly,
+    fallbackUsed
   };
 }
 
@@ -169,7 +179,15 @@ const App = () => {
   const [rate, setRate] = useState(1);
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
-  const { voices, selectedId, setSelectedId, selectedVoice, warning: voiceWarning } = useSpeechVoices();
+  const {
+    voices,
+    selectedId,
+    setSelectedId,
+    selectedVoice,
+    warningMessage,
+    googleOnly,
+    fallbackUsed
+  } = useSpeechVoices();
 
   const speakingText = useMemo(() => (viewMode === "markdown" ? markdownToPlainText(rawInput) : rawInput), [rawInput, viewMode]);
   const chunks = useMemo(() => segmentJapanese(speakingText), [speakingText]);
@@ -274,9 +292,19 @@ const App = () => {
             このブラウザでは SpeechSynthesis が利用できません。対応ブラウザ（Chrome/Edge 最新、Safari 16+）でお試しください。
           </Alert>
         )}
-        {voiceWarning && (
+        {warningMessage && (
           <Alert>
-            日本語音声が検出できませんでした。ブラウザやOSの言語設定を確認するか、再読み込み後に voice 設定を変更してください。
+            {warningMessage}
+          </Alert>
+        )}
+        {!warningMessage && fallbackUsed && (
+          <Alert className="border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-600/50 dark:bg-blue-900/30 dark:text-blue-100">
+            Google 日本語 voice が見つからなかったため、この環境で利用できる日本語 voice で読み上げます。
+          </Alert>
+        )}
+        {!warningMessage && googleOnly && (
+          <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/50 dark:bg-emerald-900/30 dark:text-emerald-100">
+            Google 日本語 voice を使用しています。速度変更時も聞き取りやすさを自動調整します。
           </Alert>
         )}
         {lastError && (
@@ -302,7 +330,7 @@ const App = () => {
             <div className="grid gap-2">
               <Label htmlFor="voice-select">音声（日本語）</Label>
               <Select value={selectedId || undefined} onValueChange={setSelectedId}>
-                <SelectTrigger id="voice-select" aria-label="日本語音声の選択" disabled={!voices.length}>
+                <SelectTrigger id="voice-select" aria-label="日本語音声の選択" disabled={!voices.length || voices.length === 1}>
                   <SelectValue placeholder="音声を選択" />
                 </SelectTrigger>
                 <SelectContent>
@@ -313,6 +341,12 @@ const App = () => {
                   ))}
                 </SelectContent>
               </Select>
+              {googleOnly && voices.length === 1 && (
+                <p className="text-xs text-muted-foreground">Google 日本語 voice のみ利用可能です。</p>
+              )}
+              {fallbackUsed && (
+                <p className="text-xs text-muted-foreground">利用可能な日本語 voice を使用しています。</p>
+              )}
             </div>
 
             <div className="grid gap-4">
