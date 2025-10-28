@@ -2,6 +2,7 @@
  * 日本語向けの軽量分割器。形態素解析なしで句読点や最大長を基準にチャンクへ分割する。
  */
 const MAX_LEN = 260; // 150–300 の中間。ブラウザ差異を考慮して控えめ。
+const MIN_LEN = 120;
 
 export function preprocess(text: string): string {
   if (!text) return "";
@@ -77,6 +78,26 @@ function chunkByLength(sentences: string[]): string[] {
   return chunks;
 }
 
+function mergeShortChunks(chunks: string[]): string[] {
+  if (!chunks.length) return [];
+  const merged: string[] = [];
+  for (const chunk of chunks) {
+    const trimmed = chunk.trim();
+    if (!trimmed) continue;
+    if (!merged.length) {
+      merged.push(trimmed);
+      continue;
+    }
+    const prev = merged[merged.length - 1];
+    if (prev.length < MIN_LEN && (prev + " " + trimmed).length <= MAX_LEN) {
+      merged[merged.length - 1] = `${prev} ${trimmed}`.trim();
+    } else {
+      merged.push(trimmed);
+    }
+  }
+  return merged;
+}
+
 export function segmentJapanese(raw: string): string[] {
   if (!raw) return [];
   const normalized = preprocess(raw);
@@ -89,7 +110,7 @@ export function segmentJapanese(raw: string): string[] {
     const blocks = splitBullets(para);
     blocks.forEach((block) => {
       const sentences = splitSentences(block);
-      const chunked = chunkByLength(sentences);
+      const chunked = mergeShortChunks(chunkByLength(sentences));
       result.push(...chunked);
     });
   });

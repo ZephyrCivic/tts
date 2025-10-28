@@ -78,24 +78,31 @@ function useSpeechVoices() {
   };
 }
 
-function usePlayer(chunks: string[], options: { rate: number; pitch: number; voice: SpeechSynthesisVoice | null }) {
+function usePlayer(chunks: string[], options: { rate: number; voice: SpeechSynthesisVoice | null }) {
   const queueRef = useRef<PlayerQueue | null>(null);
   const [playerState, setPlayerState] = useState<PlayerState>("stopped");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [charOffset, setCharOffset] = useState(0);
+  const [boundarySupported, setBoundarySupported] = useState(false);
 
   useEffect(() => {
     const queue = new PlayerQueue([], {}, {
       onIndex: (index, total) => {
         setCurrentIndex(total ? Math.min(index, total - 1) : 0);
         setTotalChunks(total);
+        setCharOffset(0);
       },
       onState: (state) => setPlayerState(state),
       onError: (error) => {
         console.warn("TTS error", error);
         const message = error instanceof Error ? error.message : String(error);
         setLastError(message);
+      },
+      onProgress: ({ charOffset: offset, boundarySupported: supported }) => {
+        setCharOffset(offset);
+        setBoundarySupported(supported);
       }
     });
     queueRef.current = queue;
@@ -107,8 +114,8 @@ function usePlayer(chunks: string[], options: { rate: number; pitch: number; voi
 
   useEffect(() => {
     if (!queueRef.current) return;
-    queueRef.current.updateSettings({ rate: options.rate, pitch: options.pitch, voice: options.voice ?? null });
-  }, [options.rate, options.pitch, options.voice]);
+    queueRef.current.updateSettings({ rate: options.rate, voice: options.voice ?? null });
+  }, [options.rate, options.voice]);
 
   useEffect(() => {
     const queue = queueRef.current;
@@ -117,9 +124,10 @@ function usePlayer(chunks: string[], options: { rate: number; pitch: number; voi
     queue.setChunks(chunks);
     setTotalChunks(chunks.length);
     setCurrentIndex(chunks.length ? Math.min(queue.getIndex(), chunks.length - 1) : 0);
+    setCharOffset(0);
   }, [chunks]);
 
-  const commands = {
+  const commands = useMemo(() => ({
     playOrPause: () => {
       const queue = queueRef.current;
       if (!queue || !chunks.length) return;
@@ -134,8 +142,14 @@ function usePlayer(chunks: string[], options: { rate: number; pitch: number; voi
     },
     stop: () => queueRef.current?.stop(),
     next: () => queueRef.current?.next(),
-    prev: () => queueRef.current?.prev()
-  };
+    prev: () => queueRef.current?.prev(),
+    seekTo: (index: number) => {
+      const queue = queueRef.current;
+      if (!queue || !chunks.length) return;
+      const shouldPlay = queue.getState() === "playing";
+      queue.seek(index, { play: shouldPlay });
+    }
+  }), [chunks.length]);
 
   return {
     playerState,
@@ -143,7 +157,9 @@ function usePlayer(chunks: string[], options: { rate: number; pitch: number; voi
     totalChunks,
     lastError,
     clearError: () => setLastError(null),
-    commands
+    commands,
+    charOffset,
+    boundarySupported
   };
 }
 
@@ -151,16 +167,24 @@ const App = () => {
   const [rawInput, setRawInput] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("text");
   const [rate, setRate] = useState(1);
-  const [pitch, setPitch] = useState(1);
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
   const { voices, selectedId, setSelectedId, selectedVoice, warning: voiceWarning } = useSpeechVoices();
 
   const speakingText = useMemo(() => (viewMode === "markdown" ? markdownToPlainText(rawInput) : rawInput), [rawInput, viewMode]);
   const chunks = useMemo(() => segmentJapanese(speakingText), [speakingText]);
 
-  const { playerState, currentIndex, totalChunks, lastError, clearError, commands } = usePlayer(chunks, {
+  const {
+    playerState,
+    currentIndex,
+    totalChunks,
+    lastError,
+    clearError,
+    commands,
+    charOffset,
+    boundarySupported
+  } = usePlayer(chunks, {
     rate,
-    pitch,
     voice: selectedVoice
   });
 
@@ -202,12 +226,24 @@ const App = () => {
 
   const progressLabel = totalChunks > 0 ? `${currentIndex + 1} / ${totalChunks}` : "0 / 0";
 
+  const totalChars = useMemo(() => chunks.reduce((sum, chunk) => sum + chunk.length, 0), [chunks]);
+  const playedChars = useMemo(() => {
+    if (!chunks.length) return 0;
+    const before = chunks.slice(0, currentIndex).reduce((sum, chunk) => sum + chunk.length, 0);
+    return before + charOffset;
+  }, [chunks, currentIndex, charOffset]);
+
   const remainingSec = useMemo(() => {
     if (!chunks.length) return null;
-    const remainChars = chunks.slice(currentIndex).reduce((sum, chunk) => sum + chunk.length, 0);
+    const remainChars = Math.max(totalChars - playedChars, 0);
     const sec = Math.ceil(remainChars / approxCharsPerSecond(rate));
     return Number.isFinite(sec) ? sec : null;
-  }, [chunks, currentIndex, rate]);
+  }, [totalChars, playedChars, rate, chunks.length]);
+
+  const progressPercent = useMemo(() => {
+    if (!totalChars) return 0;
+    return Math.min(100, Math.round((playedChars / totalChars) * 100));
+  }, [playedChars, totalChars]);
 
   const etaLabel = remainingSec !== null ? formatSeconds(remainingSec) : "--:--";
 
@@ -260,7 +296,7 @@ const App = () => {
               <Volume2 className="h-5 w-5" />
               再生コントロール
             </CardTitle>
-            <CardDescription>速度・ピッチ・音声の調整と再生操作をまとめています。</CardDescription>
+            <CardDescription>速度と音声の調整、再生操作をまとめています。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-2">
@@ -294,21 +330,11 @@ const App = () => {
                   }}
                   aria-label="速度"
                 />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="pitch-slider">ピッチ {pitch.toFixed(2)}</Label>
-                <Slider
-                  id="pitch-slider"
-                  min={0.5}
-                  max={2}
-                  step={0.05}
-                  value={[pitch]}
-                  onValueChange={([val]) => {
-                    const next = typeof val === "number" ? val : pitch;
-                    setPitch(Number(next.toFixed(2)));
-                  }}
-                  aria-label="ピッチ"
-                />
+                {!boundarySupported && playerState === "playing" && (
+                  <p className="text-xs text-muted-foreground">
+                    一部ブラウザでは速度変更が次の文から反映されます。
+                  </p>
+                )}
               </div>
             </div>
 
@@ -348,9 +374,32 @@ const App = () => {
               </Button>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
-              <span>進行状況: {progressLabel}</span>
-              <span>残り {etaLabel}</span>
+            <div className="space-y-2 rounded-lg border border-dashed px-3 py-3">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>進行状況: {progressLabel}</span>
+                <span>{progressPercent}%</span>
+              </div>
+              <Slider
+                min={0}
+                max={Math.max(totalChunks - 1, 0)}
+                step={1}
+                value={[scrubIndex ?? currentIndex]}
+                onValueChange={([val]) => {
+                  const next = Number.isFinite(val) ? Math.round(Number(val)) : currentIndex;
+                  setScrubIndex(next);
+                }}
+                onValueCommit={([val]) => {
+                  const next = Number.isFinite(val) ? Math.round(Number(val)) : currentIndex;
+                  setScrubIndex(null);
+                  commands.seekTo(next);
+                }}
+                disabled={!totalChunks}
+                aria-label="シークバー"
+              />
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>残り {etaLabel}</span>
+                <span>位置 {scrubIndex !== null ? scrubIndex + 1 : currentIndex + 1} / {Math.max(totalChunks, 1)}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
