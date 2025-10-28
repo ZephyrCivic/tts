@@ -30,10 +30,34 @@ button:focus { outline: 2px solid var(--brand); outline-offset: 2px; }
 button[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 .paste textarea { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid #ccc; background: transparent; color: var(--fg); }
-.viewer h2 { margin-top: 16px; font-size: 1.1rem; color: var(--muted); }
+.viewer-header { margin-top: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.viewer-header h2 { margin: 0; font-size: 1.1rem; color: var(--muted); }
+.viewer-switch { display: flex; gap: 8px; }
+.viewer-switch label { display: inline-flex; align-items: center; gap: 4px; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
+.viewer-switch input[type="radio"] { accent-color: var(--brand); }
+.mode-hint { margin: 4px 0 8px; font-size: 0.85rem; color: var(--muted); }
 .viewer-content { border: 1px solid #ccc; border-radius: 8px; padding: 10px; min-height: 120px; max-height: 40vh; overflow: auto; line-height: 1.6; }
 .chunk { display: inline; }
 .chunk + .sep { display: inline; color: var(--muted); }
 .chunk.playing { background: var(--playing-bg); border-radius: 4px; box-shadow: 0 0 0 2px rgba(255,200,0,0.25) inset; }
+.viewer-markdown { white-space: normal; }
+.viewer-markdown pre { background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; overflow: auto; }
+@media (prefers-color-scheme: dark) {
+  .viewer-markdown pre { background: rgba(255,255,255,0.08); }
+}
+.viewer-markdown ul,
+.viewer-markdown ol { margin: 0.4em 0 0.6em 1.2em; padding-left: 0.8em; }
+.viewer-markdown blockquote { margin: 0.4em 0; padding-left: 10px; border-left: 4px solid var(--accent); color: var(--muted); }
+.viewer-markdown hr { border: none; border-top: 1px solid rgba(0,0,0,0.15); margin: 12px 0; }
+@media (prefers-color-scheme: dark) {
+  .viewer-markdown hr { border-top-color: rgba(255,255,255,0.25); }
+}
+.viewer-markdown code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: rgba(0,0,0,0.04); padding: 0 3px; border-radius: 4px; }
+@media (prefers-color-scheme: dark) {
+  .viewer-markdown code { background: rgba(255,255,255,0.12); }
+}
+.viewer-markdown a { color: var(--brand); text-decoration: underline; }
+.viewer-markdown .md-img { color: var(--muted); font-style: italic; }
+.viewer-empty { color: var(--muted); font-style: italic; }
 
 .help summary { cursor: pointer; }

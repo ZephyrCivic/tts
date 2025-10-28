@@ -2,6 +2,7 @@ import { segmentJapanese } from "./segmentation/japanese.js";
 import { PlayerQueue } from "./player/queue.js";
 import * as voices from "./voices/detect.js";
 import * as highlight from "./ui/highlight.js";
+import { markdownToHtml, markdownToPlainText, hasBlockContent } from "./ui/markdown.js";
 import { canUseTTS } from "./tts/engine.js";
 
 const els = {
@@ -14,12 +15,17 @@ const els = {
   playPause: document.getElementById('playPause'), stop: document.getElementById('stop'),
   prev: document.getElementById('prev'), next: document.getElementById('next'),
   progress: document.getElementById('progress'), eta: document.getElementById('eta'),
-  viewer: document.getElementById('viewer'),
+  viewerText: document.getElementById('viewerText'),
+  viewerMarkdown: document.getElementById('viewerMarkdown'),
+  displayModeRadios: document.querySelectorAll('input[name="displayMode"]'),
+  modeHint: document.getElementById('modeHint'),
 };
 
 const state = {
-  text: '',
+  rawInput: '',
+  plainText: '',
   chunks: [],
+  viewMode: 'text',
   settings: { rate: 1, pitch: 1, volume: 1, voice: null },
   queue: null,
 };
@@ -36,10 +42,69 @@ function formatSec(s) {
 }
 
 function updateProgress(i, total) {
-  els.progress.textContent = `${i + 1} / ${Math.max(total, 0)}`;
-  const sec = approxRemainingSec(i, total, state.chunks, state.settings.rate);
-  els.eta.textContent = `残り ${isFinite(sec) ? formatSec(sec) : '--:--'}`;
-  highlight.setPlaying(els.viewer, i);
+  const safeTotal = Math.max(total, 0);
+  const safeIndex = safeTotal > 0 ? Math.min(i, safeTotal - 1) : 0;
+  const displayIndex = safeTotal > 0 ? safeIndex + 1 : 0;
+  els.progress.textContent = `${displayIndex} / ${safeTotal}`;
+  if (safeTotal === 0) {
+    els.eta.textContent = '残り --:--';
+  } else {
+    const sec = approxRemainingSec(safeIndex, safeTotal, state.chunks, state.settings.rate);
+    els.eta.textContent = `残り ${isFinite(sec) ? formatSec(sec) : '--:--'}`;
+  }
+  highlight.setPlaying(els.viewerText, safeIndex);
+}
+
+function syncViewerVisibility() {
+  const isMarkdown = state.viewMode === 'markdown';
+  if (els.viewerText) {
+    els.viewerText.hidden = isMarkdown;
+    els.viewerText.setAttribute('aria-hidden', String(isMarkdown));
+  }
+  if (els.viewerMarkdown) {
+    els.viewerMarkdown.hidden = !isMarkdown;
+    els.viewerMarkdown.setAttribute('aria-hidden', String(!isMarkdown));
+  }
+}
+
+function updateModeHint() {
+  if (!els.modeHint) return;
+  els.modeHint.hidden = state.viewMode !== 'markdown';
+}
+
+function renderMarkdownPreview() {
+  if (!els.viewerMarkdown) return;
+  if (state.viewMode !== 'markdown') {
+    els.viewerMarkdown.innerHTML = '';
+    return;
+  }
+  const html = markdownToHtml(state.rawInput);
+  if (html && hasBlockContent(html)) {
+    els.viewerMarkdown.innerHTML = html;
+  } else if (state.rawInput.trim()) {
+    els.viewerMarkdown.textContent = state.rawInput;
+  } else {
+    els.viewerMarkdown.innerHTML = '<p class="viewer-empty">Markdownプレビューがありません。</p>';
+  }
+}
+
+function refreshContent() {
+  state.plainText = state.viewMode === 'markdown'
+    ? markdownToPlainText(state.rawInput)
+    : state.rawInput;
+  state.chunks = segmentJapanese(state.plainText);
+  if (els.viewerText) {
+    highlight.renderChunks(els.viewerText, state.chunks);
+  }
+  if (state.queue) {
+    state.queue.stop();
+    state.queue.setChunks(state.chunks);
+  } else {
+    updateProgress(0, state.chunks.length);
+  }
+  renderMarkdownPreview();
+  syncViewerVisibility();
+  updateModeHint();
 }
 
 function fillVoices(vs, selected) {
@@ -96,13 +161,20 @@ async function init() {
 
   // 入力
   const onInput = () => {
-    state.text = String(els.paste.value || '');
-    state.chunks = segmentJapanese(state.text);
-    highlight.renderChunks(els.viewer, state.chunks);
-    updateProgress(0, state.chunks.length);
-    if (state.queue) state.queue.setChunks(state.chunks);
+    state.rawInput = String(els.paste.value || '');
+    refreshContent();
   };
   els.paste.addEventListener('input', onInput);
+
+  Array.from(els.displayModeRadios || []).forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      const next = radio.value === 'markdown' ? 'markdown' : 'text';
+      if (state.viewMode === next) return;
+      state.viewMode = next;
+      refreshContent();
+    });
+  });
 
   // 再生系
   state.queue = new PlayerQueue([], state.settings, {
@@ -141,6 +213,9 @@ async function init() {
     if (e.key === '+') { els.rate.value = String(Math.min(2, Number(els.rate.value) + 0.05)); els.rate.dispatchEvent(new Event('input')); }
     if (e.key === '-') { els.rate.value = String(Math.max(0.5, Number(els.rate.value) - 0.05)); els.rate.dispatchEvent(new Event('input')); }
   });
+
+  state.rawInput = String(els.paste.value || '');
+  refreshContent();
 }
 
 init();

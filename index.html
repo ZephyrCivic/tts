@@ -43,8 +43,16 @@
     </section>
 
     <section class="viewer" aria-label="読み上げ対象テキスト">
-      <h2>プレビュー（文単位）</h2>
-      <div id="viewer" class="viewer-content" tabindex="0" aria-live="off"></div>
+      <div class="viewer-header">
+        <h2>プレビュー</h2>
+        <div class="viewer-switch" role="radiogroup" aria-label="表示モード">
+          <label><input type="radio" name="displayMode" value="text" checked />テキスト</label>
+          <label><input type="radio" name="displayMode" value="markdown" />Markdown</label>
+        </div>
+      </div>
+      <p id="modeHint" class="mode-hint" hidden>Markdownプレビュー中はハイライト確認のため「テキスト」に切り替えられます。</p>
+      <div id="viewerText" class="viewer-content viewer-text" tabindex="0" aria-live="off"></div>
+      <div id="viewerMarkdown" class="viewer-content viewer-markdown" tabindex="0" aria-live="polite" hidden></div>
     </section>
 
     <section class="help">
