@@ -1,10 +1,21 @@
 export function waitForVoices(timeoutMs = 1500) {
   return new Promise((resolve) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      resolve([]);
+      return;
+    }
+    const { speechSynthesis } = window;
     const voices = speechSynthesis.getVoices();
     if (voices && voices.length) return resolve(voices);
     let done = false;
-    const on = () => { if (!done) { done = true; resolve(speechSynthesis.getVoices()); speechSynthesis.removeEventListener('voiceschanged', on); } };
-    speechSynthesis.addEventListener('voiceschanged', on);
+    const on = () => {
+      if (!done) {
+        done = true;
+        resolve(speechSynthesis.getVoices());
+        speechSynthesis.removeEventListener("voiceschanged", on);
+      }
+    };
+    speechSynthesis.addEventListener("voiceschanged", on);
     setTimeout(() => on(), timeoutMs);
   });
 }
