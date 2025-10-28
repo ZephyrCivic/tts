@@ -140,11 +140,7 @@ function usePlayer(chunks: string[], options: { rate: number; volume: number; vo
   useEffect(() => {
     const queue = queueRef.current;
     if (!queue) return;
-    queue.stop();
-    queue.setChunks(chunks);
-    setTotalChunks(chunks.length);
-    setCurrentIndex(chunks.length ? Math.min(queue.getIndex(), chunks.length - 1) : 0);
-    setCharOffset(0);
+    queue.refreshChunks(chunks);
   }, [chunks]);
 
   const commands = useMemo(() => ({

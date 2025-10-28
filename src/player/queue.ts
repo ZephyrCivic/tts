@@ -53,6 +53,28 @@ export class PlayerQueue {
     this.emitIndex();
   }
 
+  refreshChunks(chunks: string[]): void {
+    const wasPlaying = this.state === "playing";
+    const prevOffset = this.lastKnownCharOffset;
+    this.chunks = chunks ?? [];
+    if (!this.chunks.length) {
+      this.index = 0;
+      this.resetOffsets();
+      this.emitIndex();
+      if (wasPlaying) this.stop();
+      return;
+    }
+    this.index = Math.min(this.index, Math.max(this.chunks.length - 1, 0));
+    this.currentChunkLength = this.chunks[this.index]?.length ?? 0;
+    this.resumeFromOffset = Math.min(prevOffset, this.currentChunkLength);
+    this.spokenOffsetBase = Math.min(this.spokenOffsetBase, this.currentChunkLength);
+    this.lastKnownCharOffset = Math.min(prevOffset, this.currentChunkLength);
+    this.emitIndex();
+    if (wasPlaying) {
+      this.restartCurrent(this.resumeFromOffset);
+    }
+  }
+
   updateSettings(patch: SpeakSettings): void {
     const prevRate = this.settings.rate;
     const prevVoice = this.settings.voice;
@@ -71,7 +93,16 @@ export class PlayerQueue {
       return;
     }
 
-    if (rateChanged || volumeChanged) {
+    if (voiceChanged && this.state === "playing") {
+      this.restartCurrent(0);
+      return;
+    }
+
+    if (volumeChanged && this.utterance) {
+      this.utterance.volume = this.settings.volume;
+    }
+
+    if (rateChanged) {
       if (this.state === "playing") {
         const restartOffset = this.boundarySupported ? this.lastKnownCharOffset : 0;
         this.restartCurrent(restartOffset);
