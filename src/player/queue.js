@@ -18,7 +18,13 @@ export class PlayerQueue {
   }
 
   updateSettings(patch) {
+    const prev = this.settings;
     this.settings = { ...this.settings, ...patch };
+    const immediateKeys = ["rate", "voice"];
+    const shouldRestart = immediateKeys.some((key) => key in (patch || {}) && prev[key] !== this.settings[key]);
+    if (shouldRestart && this.state === "playing") {
+      this._restartCurrent();
+    }
   }
 
   play(startIndex = null) {
@@ -98,6 +104,18 @@ export class PlayerQueue {
         }
       }
     });
+  }
+
+  _restartCurrent() {
+    if (!this.chunks.length) return;
+    if (this.utt) {
+      this.utt.onend = null;
+      this.utt.onerror = null;
+    }
+    ttsCancel();
+    this.retries = 0;
+    this.utt = null;
+    this._speakCurrent();
   }
 
   _emitIndex() { this.listeners.onIndex && this.listeners.onIndex(this.i, this.chunks.length); }
